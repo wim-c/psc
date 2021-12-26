@@ -1,22 +1,22 @@
-import scm
+import psc
 
 
-class EvRequestOn(scm.Event): pass
-class EvRequestOff(scm.Event): pass
+class EvRequestOn(psc.Event): pass
+class EvRequestOff(psc.Event): pass
 
 
-class EvTurnedOn(scm.Event): pass
-class EvTurnedOff(scm.Event): pass
+class EvTurnedOn(psc.Event): pass
+class EvTurnedOff(psc.Event): pass
 
 
-class ReplyOnRequested(scm.Reply): pass
-class ReplyOffRequested(scm.Reply): pass
+class ReplyOnRequested(psc.Reply): pass
+class ReplyOffRequested(psc.Reply): pass
 
-class ReplyTurnOn(scm.Reply): pass
-class ReplyTurnOff(scm.Reply): pass
+class ReplyTurnOn(psc.Reply): pass
+class ReplyTurnOff(psc.Reply): pass
 
 
-class OnRequest(scm.SimpleState):
+class OnRequest(psc.SimpleState):
     def enter(self):
         print('OnRequest.enter')
 
@@ -31,7 +31,7 @@ class OnRequest(scm.SimpleState):
         self.reply(ReplyOffRequested())
 
 
-class OffRequest(scm.SimpleState):
+class OffRequest(psc.SimpleState):
     def enter(self):
         print('OffRequest.enter')
 
@@ -46,7 +46,7 @@ class OffRequest(scm.SimpleState):
         self.reply(ReplyOnRequested())
 
 
-class RequestState(scm.CompositeState):
+class RequestState(psc.CompositeState):
     states = [OnRequest, OffRequest]
 
     def enter(self):
@@ -56,7 +56,7 @@ class RequestState(scm.CompositeState):
         print('RequestState.exit')
 
 
-class On(scm.SimpleState):
+class On(psc.SimpleState):
     def enter(self):
         print('On.enter')
 
@@ -64,7 +64,7 @@ class On(scm.SimpleState):
         print('On.exit')
 
 
-class GoingOff(scm.SimpleState):
+class GoingOff(psc.SimpleState):
     def enter(self):
         print('GoingOff.enter')
         self.reply(ReplyTurnOff())
@@ -76,7 +76,7 @@ class GoingOff(scm.SimpleState):
         self.goto(Off)
 
 
-class GoingOn(scm.SimpleState):
+class GoingOn(psc.SimpleState):
     def enter(self):
         print('GoingOn.enter')
         self.reply(ReplyTurnOn())
@@ -88,7 +88,7 @@ class GoingOn(scm.SimpleState):
         self.goto(On)
 
 
-class Off(scm.SimpleState):
+class Off(psc.SimpleState):
     def enter(self):
         print('Off.enter')
 
@@ -96,7 +96,7 @@ class Off(scm.SimpleState):
         print('Off.exit')
 
 
-class EngineState(scm.CompositeState):
+class EngineState(psc.CompositeState):
     states = [Off, GoingOn, GoingOff, On]
 
     def enter(self):
@@ -106,7 +106,7 @@ class EngineState(scm.CompositeState):
         print('EngineState.exit')
 
 
-class TurnOn(scm.JointState):
+class TurnOn(psc.JointState):
     states = [OnRequest, Off]
 
     def enter(self):
@@ -117,7 +117,7 @@ class TurnOn(scm.JointState):
         print('TurnOn.exit')
 
 
-class TurnOff(scm.JointState):
+class TurnOff(psc.JointState):
     states = [OffRequest, On]
 
     def enter(self):
@@ -128,7 +128,7 @@ class TurnOff(scm.JointState):
         print('TurnOff.exit')
 
 
-class TopState(scm.ParallelState):
+class TopState(psc.ParallelState):
     states = [RequestState, EngineState]
     joint_states = [TurnOn, TurnOff]
 
@@ -139,7 +139,7 @@ class TopState(scm.ParallelState):
         print('TopState.exit')
 
 
-class ExampleStateChart(scm.StateChart):
+class ExampleStateChart(psc.StateChart):
     state = TopState
 
     def reply(self, reply:ReplyOnRequested):
