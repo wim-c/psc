@@ -27,7 +27,7 @@ class OnRequest(psc.SimpleState):
         print('OnRequest.exit')
 
     def handle(self, event:EvRequestOff):
-        self.goto(OffRequest)
+        self.transit(OffRequest)
         self.reply(ReplyOffRequested())
 
 
@@ -42,7 +42,7 @@ class OffRequest(psc.SimpleState):
         print('OffRequest.exit')
 
     def handle(self, event:EvRequestOn):
-        self.goto(OnRequest)
+        self.transit(OnRequest)
         self.reply(ReplyOnRequested())
 
 
@@ -73,7 +73,7 @@ class GoingOff(psc.SimpleState):
         print('GoingOff.exit')
 
     def handle(self, event:EvTurnedOff):
-        self.goto(Off)
+        self.transit(Off)
 
 
 class GoingOn(psc.SimpleState):
@@ -85,7 +85,7 @@ class GoingOn(psc.SimpleState):
         print('GoingOn.exit')
 
     def handle(self, event:EvTurnedOn):
-        self.goto(On)
+        self.transit(On)
 
 
 class Off(psc.SimpleState):
@@ -111,7 +111,7 @@ class TurnOn(psc.JointState):
 
     def enter(self):
         print('TurnOn.enter')
-        self.goto(GoingOn)
+        self.transit(GoingOn)
 
     def exit(self):
         print('TurnOn.exit')
@@ -122,7 +122,7 @@ class TurnOff(psc.JointState):
 
     def enter(self):
         print('TurnOff.enter')
-        self.goto(GoingOff)
+        self.transit(GoingOff)
 
     def exit(self):
         print('TurnOff.exit')

@@ -115,8 +115,8 @@ class AbstractState:
     def reply(self, event):
         self._state_chart._reply(event)
 
-    def goto(self, state_type):
-        self._state_chart._goto(state_type)
+    def transit(self, state_type):
+        self._state_chart._transit(state_type)
 
     def _invoke_event_handlers(self, handlers, event):
         result = HandleResult.HANDLED
@@ -378,10 +378,10 @@ class ParallelState(ParentState, metaclass=StateMeta, is_state_type=False):
 class JointState(AbstractState, metaclass=StateMeta, is_state_type=False):
     @classmethod
     def _prepare_state_type(cls):
-        target_states = []
+        guard_states = []
         for state_type in cls.states:
-            state_type._add_targets_to(target_states)
-        cls._states = list(set(target_states))
+            state_type._add_targets_to(guard_states)
+        cls._states = list(set(guard_states))
 
     @classmethod
     def _add_targets_to(cls, target_states):
@@ -453,7 +453,7 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
         self._current_event = None
         self._event_queue = []
         self._reply_queue = None
-        self._goto_queue = []
+        self._transit_queue = []
         self.name = name
 
     def _dispatch_reply(self, reply):
@@ -469,9 +469,9 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
         else:
             reply_queue.append(reply)
 
-    def _goto(self, state_type):
+    def _transit(self, state_type):
         if self.state._has_state_type(state_type):
-            self._goto_queue.append(state_type)
+            self._transit_queue.append(state_type)
         else:
             self.report_transition_error(state_type)
 
@@ -483,8 +483,8 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
             self._state = state
         state._initiate(None)
 
-        while len(self._goto_queue) > 0:
-            self._handle_gotos(None)
+        while len(self._transit_queue) > 0:
+            self._handle_transitions(None)
 
         self.report_initiated()
 
@@ -588,7 +588,7 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
         self._reply_queue = (reply_queue := [])
 
         # Handle the current event.  This can lead to any number of queued
-        # replies and gotos (state transitions).
+        # replies and transitions (state transitions).
         if state._handle(event) != HandleResult.HANDLED:
             self.report_unprocessed_event()
 
@@ -596,37 +596,37 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
         # immediately.
         self._reply_queue = None
 
-        # Handle all scheduled gotos.  Execute scheduled reply handlers
+        # Handle all scheduled transitions.  Execute scheduled reply handlers
         # between handling all exit handlers and handling all entry
         # handlers.
-        self._handle_gotos(reply_queue)
+        self._handle_transitions(reply_queue)
 
-        # Repeatedly handle possible further gotos.  No (queued) replies
+        # Repeatedly handle possible further transitions.  No (queued) replies
         # need to be executed anymore.
-        while len(self._goto_queue) > 0:
-            self._handle_gotos(None)
+        while len(self._transit_queue) > 0:
+            self._handle_transitions(None)
 
-        # The event has been handled (if possible) and the reply and goto
+        # The event has been handled (if possible) and the reply and transit
         # queues have been reset.  Allow the processing of a next event. 
         self._current_event = None
 
         self.report_event_procesed(event)
 
-    def _handle_gotos(self, reply_queue):
+    def _handle_transitions(self, reply_queue):
         state = self._state
         event = self._current_event
 
         # Only process the current amount of transition request.  More
         # transition requests may be queued while processing, but these will
         # only be processed in the next call to this method.
-        target_count = len(goto_queue := self._goto_queue)
+        target_count = len(transit_queue := self._transit_queue)
 
         if target_count > 0:
-            self.report_transitions(goto_queue)
+            self.report_transitions(transit_queue)
 
-        # Exit all states as required by the set of all scheduled gotos.
+        # Exit all states as required by the set of all scheduled transitions.
         for target_index in range(target_count):
-            target_type = goto_queue[target_index]
+            target_type = transit_queue[target_index]
             if state._exit_for_state(target_type, event):
                 state._exit(event)
 
@@ -646,13 +646,13 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
             state = self._state
             state._enter(event)
 
-        # Enter all states as required by the set of all scheduled gotos.
+        # Enter all states as required by the set of all scheduled transitions.
         for target_index in range(target_count):
-            target_type = goto_queue[target_index]
+            target_type = transit_queue[target_index]
             if not state._enter_for_state(target_type, event):
                 self.report_transition_error(target_type)
 
         # Remove all handled transitions from the transition queue.  Note that
         # more transitions may remain if exit-, reply-, and entry handlers
         # requested these.
-        del goto_queue[:target_count]
+        del transit_queue[:target_count]
