@@ -228,9 +228,10 @@ have triggered and before any entry handler is triggered.
 Any type can be used as either event type or reply type in PSC.  Nevertheless,
 PSC defines the base types `Event` and `Reply` from which you can derive your
 own event and reply types.  This has several advantages: It explicitly
-expresses that certain types are intended to be events (sent to state chart) or
-replies (sent from a state chart) and both base classes provide basic `__str__`
-method implementations that are convenient when logging events or replies.
+expresses that certain types are intended to be events (sent to a state chart)
+or replies (sent from a state chart) and both base classes provide basic
+`__str__` method implementations that are convenient when logging events or
+replies.
 
 ```python
 import psc
@@ -249,7 +250,7 @@ PCS supports four different types of states: simple states, composite states,
 parallel states, and joint states.  Each of these is described in the following sections.
 
 ### The `SimpleState` class
-A simple state is a leaf state: it can have no child states.  A simple state is defined by deriving from the `SimpleState class`.
+A simple state is a leaf state: it can have no child states.  A simple state is defined by deriving from the `SimpleState` class.
 
 ```python
 import psc
@@ -339,7 +340,7 @@ of its guard states.  In this case the joint states becomes active because all
 its guard states become active.
 
 A joint state is defined by deriving from the `JointState` class.  It must
-define a class variable called `states` that lists the state types of its guard
+define a class variable called `guards` that lists the state types of its guard
 states.
 
 ```python
@@ -348,9 +349,153 @@ import psc
 
 class MyJointState(psc.JointState):
     # The list of guard state types.
-    states = [GuardA, GuardB]
+    guards = [GuardA, GuardB]
 
     # State behavior methods are defined here.
 ```
 
-## The StateChart class
+## The `StateChart` class
+A PSC state chart is defined by deriving from the `StateChart` class.  Unike in
+some other libraries, a state chart is itself _not_ a state.  Instead, a state
+chart has a single top state.  The type of this top state must be specified in
+a class variable named `state`.  The top state can be a simple state,
+composite state, or parallel state.  The state chart constructor takes an
+optional keyword `name` argument.  This name is only used in diagnostic
+messages where it is useful to distinguish between different instances of the
+same state chart type.
+
+```python
+import psc
+
+
+class MyStateChart(psc.StateChart):
+    # The type of the top state of this state chart.
+    state = TopState
+
+    # Initialize the state chart with a reference to a client object and a name
+    # for this instance.
+    def __init__(self, client, name):
+        super().__init__(name=name)
+
+        # Keep a reference to a client object.  Typically all state chart
+        # replies will be forwarded to some method of this client object.
+        self.client = client
+
+    # Add reply handlers here.
+```
+
+### Reply handlers
+All replies that are sent by entry-, exit-, and event handlers in any of a
+state chart's states are routed to the reply handlers that are defined in the
+state chart.  A reply handler is a state chart method named `reply` that takes
+a single `reply` argument of a specific reply type.  A state chart must define
+at least one reply handler for each reply type that can be sent by the state
+chart.  More than one handler may be defined for the same reply type.  In that
+case all handlers will trigger when a reply of that type is sent.
+
+```python
+    def reply(self, reply:ReplyA):
+        # Call client code to handle this state chart reply.
+        self.client.react_to_reply_a(reply.param)
+```
+
+The implementation of a reply handler typically calls back into the client
+code.  It is allowed to process new events in a reply handler.  These events
+will be queued in the state chart (in the order in which they are received) and
+processed directly after the current event has been completely processed.
+
+### The `StateChart` interface
+The following sections describe the methods that client code can use on a state
+chart.
+
+#### `initiate()` and `terminate()`
+> A state chart begins with its top state inactive.  In particular this means
+> that it cannot process events yet.  The top state is activated by calling the
+> `initiate` method.  This activates the top state as if a transition was made
+> to the top state.  In particular entry handlers are triggered as usual.
+> Event specific entry handlers will not be triggered because there is no
+> current event during the `initiate` call.
+> 
+> The top state can be deactivated by calling the `terminate` method.  This
+> will trigger exit handlers as usual.  Again, event specific exit handlers
+> will not be triggered because there is no current event during the
+> `terminate` call.
+
+#### `process(event)`
+> The `process` method processes an event instance that is passed as argument
+> to the method.  If the state chart is not processing an event already then
+> the `process` call runs to completion.  That is, when the call returns the
+> event has been completely handled and all its effects (replies and state
+> transitions) have been processed.  If the state chart is already processing
+> an event when `process` is called then the event is queued for later
+> processing and the call returns immediately.  This typically happens when a
+> reply handler of the state chart calls the client object which in turn calls
+> `process` again on the the state chart.
+
+### Error and diagnostic messages
+A state chart method can encounter error situations (such as an unprocessed
+event) and will also generate diagnostic messages.  By default a state chart
+simply discards all these errors and messages.  This behavior can be changed by
+overriding some state chart methods in a derived class.  The following sections
+describe the methods that are used for error and diagnostic messages.
+
+#### `def log(self, msg_factory):`
+> Intended to log a diagnostic message.  Called by the default implementations
+> of `report_error` and `report_info`.  The `msg_factory` argument is a
+> function that produces an appropriate diagnostic string when called.  The
+> `log` method does nothing by default.  Override this method if errors and
+> diagnostic messages only need to be logged and errors are not fatal.
+
+#### `def report_error(self, msg_factory):`
+> Intended to report an error situation.  Called by the default implementations
+> of `report_unprocessed_event`, `report_unprocessed_reply`,
+> `report_transition_error`, and `report_not_initiated`.  The `msg_factory`
+> argument is a function that produces an appropriate error diagnostic string
+> when called.  Override this method to implement behavior for all error
+> situations, such as throwing an exception.
+
+#### `def report_info(self, msg_factory):`
+> Intended to report an information message for diagnostic purposes.  Called by
+> the default implementations of `report_initiated`, `report_terminated`,
+> `report_transitions`, and `report_event_procesed`.  The `msg_factory`
+> argument is a function that produces an appropriate diagnostic string when
+> called.  Override this method to log all information messages with some
+> specific logging mechanism.
+
+#### `def report_unprocessed_event(self):`
+> This is called when an event could not be processed in the current state.
+> Calls `report_error` by default.
+
+#### `def report_unprocessed_reply(self, reply):`
+> This is called when there is no handler defined for a sent reply.  Calls
+> `report_error` by default.
+
+#### `def report_transition_error(self, state_type):`
+> This is called when a requested state transition cannot be completed.  This
+> can happen when a target state type does not occur in the state chart or when
+> not all target states can be activated.  For example is state types are not
+> located in different parallel regions, they may not both be activated.  This
+> indicates a design fault in the state machine definition.  Calls
+> `report_error` by default.
+
+#### `def report_not_initiated(self):`
+> This is called when `process` is called while the top state is not active.
+> Calls `report_error` by default.
+
+#### `def report_initiated(self):`
+> This is called when the `initiate` method completes.  Calls `report_info` by
+> default.
+
+#### `def report_terminated(self):`
+> This is called when the `terminate` method completes.  Calls `report_info` by
+> default.
+
+#### `def report_transitions(self, states):`
+> This is called just before one or more atomic state transitions will take
+> place.  Calls `report_info` by default.
+
+#### `def report_event_procesed(self, event):`
+> This is called when an event has been processed, even if errors were reported
+> while processing.  The state chart is in a stable state when this method is
+> called so no state transitions are pending anymore.  Calls `report_info` by
+> default.
