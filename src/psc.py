@@ -178,12 +178,12 @@ class ConcreteState(AbstractState):
 
         if (joint_states := self._linked_joint_states) is not None:
             for state in joint_states:
-                state._enter_required_state(event)
+                state._enter_guard_state(event)
 
     def _exit(self, event):
         if (joint_states := self._linked_joint_states) is not None:
             for state in joint_states:
-                state._exit_required_state(event)
+                state._exit_guard_state(event)
 
         super()._exit(event)
 
@@ -379,32 +379,32 @@ class JointState(AbstractState, metaclass=StateMeta, is_state_type=False):
     @classmethod
     def _prepare_state_type(cls):
         guard_states = []
-        for state_type in cls.states:
+        for state_type in cls.guards:
             state_type._add_targets_to(guard_states)
-        cls._states = list(set(guard_states))
+        cls._guards = list(set(guard_states))
 
     @classmethod
     def _add_targets_to(cls, target_states):
-        target_states.extend(cls._states)
+        target_states.extend(cls._guards)
 
     def __init__(self, constructor):
         super().__init__(constructor)
-        self._inactive_states = len(self._states)
-        for state_type in self._states:
+        self._inactive_guards = len(self._guards)
+        for state_type in self._guards:
             constructor.get_instance(state_type)._link_joint_state(self)
 
-    def _enter_required_state(self, event):
-        self._inactive_states -= 1
-        if self._inactive_states == 0:
+    def _enter_guard_state(self, event):
+        self._inactive_guards -= 1
+        if self._inactive_guards == 0:
             self._enter(event)
             
-    def _exit_required_state(self, event):
-        if self._inactive_states == 0:
+    def _exit_guard_state(self, event):
+        if self._inactive_guards == 0:
             self._exit(event)
-        self._inactive_states += 1
+        self._inactive_guards += 1
 
     def _is_active(self):
-        return self._inactive_states == 0
+        return self._inactive_guards == 0
 
 
 class StateChartDict:

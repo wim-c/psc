@@ -107,7 +107,7 @@ class EngineState(psc.CompositeState):
 
 
 class TurnOn(psc.JointState):
-    states = [OnRequest, Off]
+    guards = [OnRequest, Off]
 
     def enter(self):
         print('TurnOn.enter')
@@ -118,7 +118,7 @@ class TurnOn(psc.JointState):
 
 
 class TurnOff(psc.JointState):
-    states = [OffRequest, On]
+    guards = [OffRequest, On]
 
     def enter(self):
         print('TurnOff.enter')
