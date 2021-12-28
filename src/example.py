@@ -142,6 +142,9 @@ class TopState(psc.ParallelState):
 class ExampleStateChart(psc.StateChart):
     state = TopState
 
+    def log(self, msg_factory):
+        print(msg_factory())
+
     def reply(self, reply:ReplyOnRequested):
         print('Example.reply:ReplyOnRequested')
 

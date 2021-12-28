@@ -454,7 +454,16 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
         self._event_queue = []
         self._reply_queue = None
         self._transit_queue = []
-        self.name = name
+        self._name = name
+
+    def __str__(self):
+        if self._state is None:
+            return self.name()
+        else:
+            return f'{self.name()}: {self._state}'
+
+    def name(self):
+        return n if (n := self._name) is not None else type(self).__name__
 
     def _dispatch_reply(self, reply):
         if (handlers := self._reply_handlers.get(type(reply))) is None:
@@ -506,74 +515,50 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
                 self._dispatch_event(event)
 
     def decorate_message(self, msg):
-        parts = []
-        if (name := self.name) is not None:
-            parts.append(f'In {name}: ')
+        parts = [f'In state chart {self.name()}']
         if (event := self._current_event) is not None:
-            parts.append(f'While processing {event}: ')
-        parts.append(msg)
+            parts.append(f' while processing {event}')
+        parts.append(f': {msg}')
         if (state := self._state) is not None:
             parts.append(' in state ')
             state._write_to(parts)
         return ''.join(parts)
 
-    def log(self, msg):
-        print(msg)
+    def log(self, msg_factory):
+        pass
 
     def report_error(self, msg_factory):
-        self.log(self.decorate_message(msg_factory()))
+        self.log(msg_factory)
 
     def report_info(self, msg_factory):
-        self.log(self.decorate_message(msg_factory()))
-
-    def get_unprocessed_event_msg(self):
-        return 'Unprocessed event'
-
-    def get_unprocessed_reply_msg(self, reply):
-        return f'Unprocessed {reply}'
-
-    def get_transition_error_msg(self, state_type):
-        return f'Transition error for {state_type.name()}'
-
-    def get_not_initiated_msg(self):
-        return 'State chart not initiated'
-
-    def get_initiated_msg(self):
-        return 'State chart initiated'
-
-    def get_terminated_msg(self):
-        return 'State chart terminated'
-
-    def get_transitions_msg(self, states):
-        states_list = ', '.join(state.name() for state in states)
-        return f'transition to [{states_list}]'
-
-    def get_event_procesed_msg(self, event):
-        return f'Processed {event}'
+        self.log(msg_factory)
 
     def report_unprocessed_event(self):
-        self.report_error(self.get_unprocessed_event_msg)
+        self.report_error(lambda: self.decorate_message('Unprocessed event'))
 
     def report_unprocessed_reply(self, reply):
-        self.report_error(lambda: self.get_unprocessed_reply_msg(reply))
+        self.report_error(lambda: self.decorate_message(f'Unprocessed {reply}'))
 
     def report_transition_error(self, state_type):
-        self.report_error(lambda: self.get_transition_error_msg(state_type))
+        self.report_error(lambda: self.decorate_message(f'Transition error for {state_type.name()}'))
 
     def report_not_initiated(self):
-        self.report_error(self.get_not_initiated_msg)
+        self.report_error(lambda: self.decorate_message('Not initiated'))
 
     def report_initiated(self):
-        self.report_info(self.get_initiated_msg)
+        self.report_info(lambda: self.decorate_message('Initiated'))
 
     def report_terminated(self):
-        self.report_info(self.get_terminated_msg)
+        self.report_info(lambda: self.decorate_message('Terminated'))
 
     def report_transitions(self, states):
-        self.report_info(lambda: self.get_transitions_msg(states))
+        def msg():
+            states_list = ', '.join(state.name() for state in states)
+            return self.decorate_message(f'Transition to [{states_list}]')
+        self.report_info(msg)
 
     def report_event_procesed(self, event):
-        self.report_info(lambda: self.get_event_procesed_msg(event))
+        self.report_info(lambda: self.decorate_message(f'After {event}'))
 
     def _dispatch_event(self, event):
         if (state := self._state) is None:
