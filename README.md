@@ -413,13 +413,13 @@ chart.
 > that it cannot process events yet.  The top state is activated by calling the
 > `initiate` method.  This activates the top state as if a transition was made
 > to the top state.  In particular entry handlers are triggered as usual.
-> Event specific entry handlers will not be triggered because there is no
-> current event during the `initiate` call.
+> Calling `initiate` is equivalent to `process(psc.Initiate())`.  It is
+> therefore possible to define initiate specifc handlers.
 > 
 > The top state can be deactivated by calling the `terminate` method.  This
-> will trigger exit handlers as usual.  Again, event specific exit handlers
-> will not be triggered because there is no current event during the
-> `terminate` call.
+> will trigger exit handlers as usual.  Calling `terminate` is equivalent to
+> `process(psc.Terminate())`.  It is therefore possible to define terminate
+> specific handlers.
 
 #### `process(event)`
 > The `process` method processes an event instance that is passed as argument
@@ -456,11 +456,10 @@ describe the methods that are used for error and diagnostic messages.
 
 #### `def report_info(self, msg_factory):`
 > Intended to report an information message for diagnostic purposes.  Called by
-> the default implementations of `report_initiated`, `report_terminated`,
-> `report_transitions`, and `report_event_procesed`.  The `msg_factory`
-> argument is a function that produces an appropriate diagnostic string when
-> called.  Override this method to log all information messages with some
-> specific logging mechanism.
+> the default implementations of `report_transitions`, and
+> `report_event_finished`.  The `msg_factory` argument is a function that
+> produces an appropriate diagnostic string when called.  Override this method
+> to log all information messages with some specific logging mechanism.
 
 #### `def report_unprocessed_event(self):`
 > This is called when an event could not be processed in the current state.
@@ -479,23 +478,15 @@ describe the methods that are used for error and diagnostic messages.
 > `report_error` by default.
 
 #### `def report_not_initiated(self):`
-> This is called when `process` is called while the top state is not active.
-> Calls `report_error` by default.
-
-#### `def report_initiated(self):`
-> This is called when the `initiate` method completes.  Calls `report_info` by
-> default.
-
-#### `def report_terminated(self):`
-> This is called when the `terminate` method completes.  Calls `report_info` by
-> default.
+> This is called when processing an event that requires the top state to be
+> active while it is not active.  Calls `report_error` by default.
 
 #### `def report_transitions(self, states):`
 > This is called just before one or more atomic state transitions will take
 > place.  Calls `report_info` by default.
 
-#### `def report_event_procesed(self, event):`
-> This is called when an event has been processed, even if errors were reported
-> while processing.  The state chart is in a stable state when this method is
-> called so no state transitions are pending anymore.  Calls `report_info` by
-> default.
+#### `def report_event_finished(self, event):`
+> This is called when processing an event is finished, even if errors were
+> reported while processing.  The state chart is in a stable state when this
+> method is called so no state transitions or replies are pending anymore.
+> Calls `report_info` by default.

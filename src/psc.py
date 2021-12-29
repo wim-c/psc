@@ -9,6 +9,10 @@ class Event:
         return type(self).__name__
 
 
+class Initiate(Event): pass
+class Terminate(Event): pass
+
+
 class Reply:
     def __str__(self):
         return f'reply {self.name()}'
@@ -484,25 +488,24 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
         else:
             self.report_transition_error(state_type)
 
-    def initiate(self):
+    def _initiate(self, event):
         if (state := self._state) is None:
             constructor = StateConstructor(self)
             state = constructor.get_instance(self.state)
-            state._enter(None)
+            state._enter(event)
             self._state = state
-        state._initiate(None)
+        state._initiate(event)
 
-        while len(self._transit_queue) > 0:
-            self._handle_transitions(None)
-
-        self.report_initiated()
-
-    def terminate(self):
+    def _terminate(self, event):
         if (state := self._state) is not None:
-            state._exit(None)
+            state._exit(event)
             self._state = None
 
-        self.report_terminated()
+    def initiate(self):
+        self.process(Initiate())
+
+    def terminate(self):
+        self.process(Terminate())
 
     def process(self, event):
         event_queue = self._event_queue
@@ -545,46 +548,44 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
     def report_not_initiated(self):
         self.report_error(lambda: self.decorate_message('Not initiated'))
 
-    def report_initiated(self):
-        self.report_info(lambda: self.decorate_message('Initiated'))
-
-    def report_terminated(self):
-        self.report_info(lambda: self.decorate_message('Terminated'))
-
     def report_transitions(self, states):
         def msg():
             states_list = ', '.join(state.name() for state in states)
             return self.decorate_message(f'Transition to [{states_list}]')
         self.report_info(msg)
 
-    def report_event_procesed(self, event):
-        self.report_info(lambda: self.decorate_message(f'After {event}'))
+    def report_event_finished(self, event):
+        self.report_info(lambda: self.decorate_message(f'Finished {event}'))
 
     def _dispatch_event(self, event):
-        if (state := self._state) is None:
-            self.report_not_initiated()
-            return
-
         # Make current event available and ensure that recursive process
         # requests get queued.
         self._current_event = event
 
-        # Queue any replies until after all exit handlers have been called.
-        self._reply_queue = (reply_queue := [])
+        if isinstance(event, Initiate):
+            self._initiate(event)
+        elif isinstance(event, Terminate):
+            self._terminate(event)
+        elif (state := self._state) is None:
+            # The top state is not active and cannot handle this event.
+            self.report_not_initiated()
+        else:
+            # Queue any replies until after all exit handlers have been called.
+            self._reply_queue = (reply_queue := [])
 
-        # Handle the current event.  This can lead to any number of queued
-        # replies and transitions (state transitions).
-        if state._handle(event) != HandleResult.HANDLED:
-            self.report_unprocessed_event()
+            # Handle the current event.  This can lead to any number of queued
+            # replies and transitions (state transitions).
+            if state._handle(event) != HandleResult.HANDLED:
+                self.report_unprocessed_event()
 
-        # Replies will not be queued anyore from this point onward but executed
-        # immediately.
-        self._reply_queue = None
+            # Replies will not be queued anyore from this point onward but
+            # executed immediately.
+            self._reply_queue = None
 
-        # Handle all scheduled transitions.  Execute scheduled reply handlers
-        # between handling all exit handlers and handling all entry
-        # handlers.
-        self._handle_transitions(reply_queue)
+            # Handle all scheduled transitions.  Execute scheduled reply
+            # handlers between handling all exit handlers and handling all
+            # entry handlers.
+            self._handle_transitions(reply_queue)
 
         # Repeatedly handle possible further transitions.  No (queued) replies
         # need to be executed anymore.
@@ -594,8 +595,7 @@ class StateChart(metaclass=StateChartMeta, is_state_chart_type=False):
         # The event has been handled (if possible) and the reply and transit
         # queues have been reset.  Allow the processing of a next event. 
         self._current_event = None
-
-        self.report_event_procesed(event)
+        self.report_event_finished(event)
 
     def _handle_transitions(self, reply_queue):
         state = self._state
