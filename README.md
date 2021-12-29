@@ -320,11 +320,13 @@ class MyParallelState(psc.ParallelState):
 ```
 
 ### The `JointState` class
-A joint state can specify any number of guard states (usually more than two,
-although this is not required).  All guard states of a joint state must be able
-to be active at the same time and a joint state may not be a guard state of
-itself (either directly or indirectly).  This usually means that guard states
-are nested states in different regions of a parallel state.  Other than these
+A joint state can refer to any number of _guard states_ (usually more than two,
+although this is not required).  These guard states must already be defined
+elsewhere in the state chart (as any of the four state types): the joint state
+only refers to them.  All guard states of a joint state must be able to be
+active at the same time and a joint state may not be a guard state of itself
+(either directly or indirectly).  This usually means that guard states are
+nested states in different regions of a parallel state.  Other than these
 restrictions, any state may appear as a guard state in any number of joint
 states.  A guard state is not a nested state of a joint state and can be active
 while the joint state itself is not active.
